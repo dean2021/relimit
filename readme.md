@@ -24,7 +24,7 @@ func main() {
 
 	control := relimit.New(relimit.Op{
 		Name:             "worker-demo",
-		MemoryUsageBytes: 1024,
+		MemoryUsageBytes: 1024 * 1024 * 10,
 		CpuUsage:         10,
 		Main:             WorkerMain,
 	})
