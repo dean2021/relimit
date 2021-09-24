@@ -15,21 +15,21 @@ type Op struct {
 	// 子进程名
 	Name string
 	// 内存限制
-	MemoryLimit float64
+	MemoryUsageBytes uint64
 	// cpu使用率限制
-	CPUPercentLimit float64
+	CpuUsage float64
 	// 子进程入口函数
 	Main func()
 }
 
 type ReLimit struct {
-	Name            string
-	MemoryLimit     float64
-	CPUPercentLimit float64
-	Process         *process.Process
+	Name             string
+	MemoryUsageBytes uint64
+	CpuUsage         float64
+	Process          *process.Process
 }
 
-func (rl *ReLimit) limit() {
+func (rl *ReLimit) cpuLimit() {
 	var isSuspend bool
 	for {
 		percent, err := rl.Process.CPUPercent()
@@ -37,7 +37,7 @@ func (rl *ReLimit) limit() {
 			panic(err)
 			return
 		}
-		if percent > rl.CPUPercentLimit {
+		if percent > rl.CpuUsage {
 			if isSuspend {
 				continue
 			}
@@ -61,6 +61,23 @@ func (rl *ReLimit) limit() {
 	}
 }
 
+func (rl *ReLimit) memoryLimit() {
+	for {
+		info, err := rl.Process.MemoryInfo()
+		if err != nil {
+			panic(err)
+			return
+		}
+		if info.RSS > rl.MemoryUsageBytes {
+			err := rl.Stop()
+			if err != nil {
+				panic(err)
+				return
+			}
+		}
+	}
+}
+
 func (rl *ReLimit) Run() error {
 	if reexec.Init() {
 		os.Exit(0)
@@ -79,7 +96,8 @@ func (rl *ReLimit) Run() error {
 	}
 	rl.Process = newProcess
 
-	go rl.limit()
+	go rl.cpuLimit()
+	go rl.memoryLimit()
 
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("failed to wait command: %s", err)
@@ -114,8 +132,8 @@ func (rl *ReLimit) Resume() error {
 func New(op Op) *ReLimit {
 	reexec.Register(op.Name, op.Main)
 	return &ReLimit{
-		Name:            op.Name,
-		CPUPercentLimit: op.CPUPercentLimit,
-		MemoryLimit:     op.MemoryLimit,
+		Name:             op.Name,
+		CpuUsage:         op.CpuUsage,
+		MemoryUsageBytes: op.MemoryUsageBytes,
 	}
 }

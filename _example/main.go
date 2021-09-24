@@ -8,18 +8,20 @@ import (
 
 // WorkerMain Subprocess entry function
 func WorkerMain() {
+	var memory []string
 	for {
-		// Dead loop, simulating CPU CPU usage increase
+		// Dead loop, simulating CPU usage increase
+		memory = append(memory, "AAAAAAA")
 	}
 }
 
 func main() {
 
 	control := relimit.New(relimit.Op{
-		Name:            "worker-demo",
-		MemoryLimit:     1024,
-		CPUPercentLimit: 10,
-		Main:            WorkerMain,
+		Name:             "worker-demo",
+		MemoryUsageBytes: 1024 * 1024 * 1024,
+		CpuUsage:         10,
+		Main:             WorkerMain,
 	})
 
 	go func(control *relimit.ReLimit) {
