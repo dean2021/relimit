@@ -50,4 +50,5 @@ func main() {
 
 # TODO
 
-1. memory limit
+1. ~~memory limit~~
+2. process state
