@@ -34,6 +34,7 @@ func (rl *ReLimit) limit() {
 	for {
 		percent, err := rl.Process.CPUPercent()
 		if err != nil {
+			panic(err)
 			return
 		}
 		if percent > rl.CPUPercentLimit {
@@ -52,6 +53,7 @@ func (rl *ReLimit) limit() {
 			}
 			err := rl.Resume()
 			if err != nil {
+				panic(err)
 				return
 			}
 			isSuspend = false
