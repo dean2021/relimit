@@ -8,17 +8,18 @@ import (
 	"fmt"
 	"github.com/dean2021/relimit/reexec"
 	"github.com/shirou/gopsutil/v3/process"
+	"log"
 	"os"
 )
 
 type Op struct {
-	// 子进程名
+	// Child process name
 	Name string
-	// 内存限制
+	// Memory limit in bytes
 	MemoryUsageBytes uint64
-	// cpu使用率限制
+	// CPU usage limit
 	CpuUsage float64
-	// 子进程入口函数
+	// Subprocess entry function
 	Main func()
 }
 
@@ -30,103 +31,154 @@ type ReLimit struct {
 }
 
 func (rl *ReLimit) cpuLimit() {
+	log.Println("Start monitoring CPU")
 	var isSuspend bool
 	for {
-		percent, err := rl.Process.CPUPercent()
-		if err != nil {
-			panic(err)
-			return
-		}
-		if percent > rl.CpuUsage {
-			if isSuspend {
-				continue
-			}
-			err := rl.Suspend()
+
+		if rl.Process != nil {
+			percent, err := rl.Process.CPUPercent()
 			if err != nil {
-				panic(err)
+				if err.Error() == "exit status 1" {
+					rl.Process = nil
+				}
+				log.Printf("Unable to limit cpu:%v\n", err)
 				return
 			}
-			isSuspend = true
+			if percent > rl.CpuUsage {
+				if isSuspend {
+					continue
+				}
+				err := rl.Suspend()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				isSuspend = true
+			} else {
+				if !isSuspend {
+					continue
+				}
+				err := rl.Resume()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				isSuspend = false
+			}
 		} else {
-			if !isSuspend {
-				continue
-			}
-			err := rl.Resume()
-			if err != nil {
-				panic(err)
-				return
-			}
-			isSuspend = false
+			break
 		}
 	}
+	log.Println("Stop monitoring CPU")
 }
 
 func (rl *ReLimit) memoryLimit() {
+
+	log.Println("Start monitoring memory")
 	for {
-		info, err := rl.Process.MemoryInfo()
-		if err != nil {
-			panic(err)
-			return
-		}
-		if info.RSS > rl.MemoryUsageBytes {
-			err := rl.Stop()
+		if rl.Process != nil {
+			info, err := rl.Process.MemoryInfo()
 			if err != nil {
-				panic(err)
+				if err.Error() == "exit status 1" {
+					rl.Process = nil
+				}
+				log.Printf("Unable to limit memory:%v\n", err)
 				return
 			}
+			if info.RSS > rl.MemoryUsageBytes {
+				err := rl.Stop()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				log.Printf("Out of memory : Kill process %d", rl.Process.Pid)
+			}
+		} else {
+			break
 		}
 	}
+	log.Println("Stop monitoring memory")
 }
 
-func (rl *ReLimit) Run() error {
-	if reexec.Init() {
-		os.Exit(0)
-	}
-	cmd := reexec.Command(rl.Name)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to run command: %s", err)
-	}
+func (rl *ReLimit) Start() {
 
-	newProcess, err := process.NewProcess(int32(cmd.Process.Pid))
-	if err != nil {
-		return fmt.Errorf("failed stop: %s", err)
-	}
-	rl.Process = newProcess
+	state := make(chan struct{})
+	go func() {
+		if reexec.Init() {
+			os.Exit(0)
+		}
+		cmd := reexec.Command(rl.Name)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			log.Printf("failed to run command: %s\n", err)
+			return
+		}
+
+		newProcess, err := process.NewProcess(int32(cmd.Process.Pid))
+		if err != nil {
+			log.Printf("failed to start process: %s\n", err)
+			return
+		}
+		rl.Process = newProcess
+
+		state <- struct{}{}
+
+		if err := cmd.Wait(); err != nil {
+			log.Printf("failed to wait command: %s\n", err)
+			return
+		}
+	}()
+
+	<-state
+
+	log.Println("Subprocess started successfully")
 
 	go rl.cpuLimit()
 	go rl.memoryLimit()
-
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to wait command: %s", err)
-	}
-	return nil
 }
 
 func (rl *ReLimit) Stop() error {
+	if rl.Process == nil {
+		return nil
+	}
 	err := rl.Process.Kill()
 	if err != nil {
-		return fmt.Errorf("failed stop: %s", err)
+		return fmt.Errorf("Unable to stop process: %v\n", err)
 	}
 	return nil
 }
 
 func (rl *ReLimit) Suspend() error {
+	if rl.Process == nil {
+		return nil
+	}
 	err := rl.Process.Suspend()
 	if err != nil {
-		return fmt.Errorf("failed suspend: %s", err)
+		return fmt.Errorf("Unable to suspend process: %v\n", err)
 	}
 	return nil
 }
 
 func (rl *ReLimit) Resume() error {
+	if rl.Process == nil {
+		return nil
+	}
 	err := rl.Process.Resume()
 	if err != nil {
-		return fmt.Errorf("failed suspend: %s", err)
+		return fmt.Errorf("Unable to resume process: %v\n", err)
 	}
 	return nil
+}
+
+func (rl *ReLimit) IsRunning() bool {
+	if rl.Process == nil {
+		return false
+	} else {
+		log.Println(rl.Process)
+		return true
+	}
 }
 
 func New(op Op) *ReLimit {
