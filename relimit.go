@@ -10,6 +10,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"log"
 	"os"
+	"time"
 )
 
 type Op struct {
@@ -34,7 +35,7 @@ func (rl *ReLimit) cpuLimit() {
 	log.Println("Start monitoring CPU")
 	var isSuspend bool
 	for {
-
+		time.Sleep(time.Second)
 		if rl.Process != nil {
 			percent, err := rl.Process.CPUPercent()
 			if err != nil {
@@ -76,6 +77,7 @@ func (rl *ReLimit) memoryLimit() {
 
 	log.Println("Start monitoring memory")
 	for {
+		time.Sleep(time.Second)
 		if rl.Process != nil {
 			info, err := rl.Process.MemoryInfo()
 			if err != nil {
@@ -101,8 +103,6 @@ func (rl *ReLimit) memoryLimit() {
 }
 
 func (rl *ReLimit) Start() {
-
-	state := make(chan struct{})
 	go func() {
 		if reexec.Init() {
 			os.Exit(0)
@@ -123,20 +123,14 @@ func (rl *ReLimit) Start() {
 		}
 		rl.Process = newProcess
 
-		state <- struct{}{}
+		go rl.cpuLimit()
+		go rl.memoryLimit()
 
 		if err := cmd.Wait(); err != nil {
 			log.Printf("failed to wait command: %s\n", err)
 			return
 		}
 	}()
-
-	<-state
-
-	log.Println("Subprocess started successfully")
-
-	go rl.cpuLimit()
-	go rl.memoryLimit()
 }
 
 func (rl *ReLimit) Stop() error {

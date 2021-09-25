@@ -14,6 +14,7 @@ func WorkerMain() {
 
 		// Allocate memory, resulting in process OOM
 		memory = append(memory, "AAAAAAA")
+		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -26,14 +27,13 @@ func main() {
 		Main:             WorkerMain,
 	})
 
-	control.Start()
-
 	// Guard the child process. When the child process stops running, pull it up again
 	for {
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 5)
 		if !control.IsRunning() {
 			log.Println("Stop the subprocess and pull up the subprocess")
 			control.Start()
+			time.Sleep(time.Second * 5)
 		}
 	}
 }
