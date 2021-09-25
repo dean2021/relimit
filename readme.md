@@ -8,15 +8,19 @@
 package main
 
 import (
-	"fmt"
 	"github.com/dean2021/relimit"
+	"log"
 	"time"
 )
 
 // WorkerMain Subprocess entry function
 func WorkerMain() {
+	var memory []string
 	for {
-		// Dead loop, simulating CPU  usage increase
+		// Dead loop, simulating CPU usage increase
+
+		// Allocate memory, resulting in process OOM
+		memory = append(memory, "AAAAAAA")
 	}
 }
 
@@ -24,27 +28,23 @@ func main() {
 
 	control := relimit.New(relimit.Op{
 		Name:             "worker-demo",
-		MemoryUsageBytes: 1024 * 1024 * 10,
+		MemoryUsageBytes: 1024 * 1024 * 1024 * 1,
 		CpuUsage:         10,
 		Main:             WorkerMain,
 	})
 
-	go func(control *relimit.ReLimit) {
-		// After 60s, manually stop the process and test it
-		time.Sleep(time.Second * 60)
-		err := control.Stop()
-		if err != nil {
-			panic(err)
+	control.Start()
+
+	// Guard the child process. When the child process stops running, pull it up again
+	for {
+		time.Sleep(time.Second * 1)
+		if !control.IsRunning() {
+			log.Println("Stop the subprocess and pull up the subprocess")
+			control.Start()
 		}
-	}(control)
-
-	err := control.Run()
-	if err != nil {
-		_ = fmt.Errorf(err.Error())
 	}
-
-	fmt.Println("Daemon stopped running")
 }
+
 
 ```
 
