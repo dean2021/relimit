@@ -14,7 +14,6 @@ func WorkerMain() {
 
 		// Allocate memory, resulting in process OOM
 		memory = append(memory, "AAAAAAA")
-		time.Sleep(time.Second * 10)
 	}
 }
 
