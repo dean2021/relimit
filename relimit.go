@@ -35,7 +35,7 @@ func (rl *ReLimit) cpuLimit() {
 	log.Println("Start monitoring CPU")
 	var isSuspend bool
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 500)
 		if rl.Process != nil {
 			percent, err := rl.Process.CPUPercent()
 			if err != nil {
@@ -77,7 +77,7 @@ func (rl *ReLimit) memoryLimit() {
 
 	log.Println("Start monitoring memory")
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 500)
 		if rl.Process != nil {
 			info, err := rl.Process.MemoryInfo()
 			if err != nil {

@@ -25,7 +25,7 @@ func main() {
 		CpuUsage:         10,
 		Main:             WorkerMain,
 	})
-
+	control.Start()
 	// Guard the child process. When the child process stops running, pull it up again
 	for {
 		time.Sleep(time.Second * 5)
