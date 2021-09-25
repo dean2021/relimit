@@ -176,7 +176,6 @@ func (rl *ReLimit) IsRunning() bool {
 	if rl.Process == nil {
 		return false
 	} else {
-		log.Println(rl.Process)
 		return true
 	}
 }
